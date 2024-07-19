@@ -44,7 +44,6 @@ jobs:
           docker stop app || true
           docker rm app || true
           docker run --name app -p 3000:3000 -d ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
-          EOF
 
       - name: Add comment to the appropriate GitHub Issue
         uses: actions/github-script@v3
