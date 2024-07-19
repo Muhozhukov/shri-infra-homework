@@ -33,7 +33,7 @@ jobs:
 
       - name: Run lint
         if: matrix.job == 'lint'
-        run: npm run test
+        run: npm run lint
 
   release:
     needs: lint-and-test
