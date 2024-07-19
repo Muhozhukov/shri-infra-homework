@@ -22,6 +22,10 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Add server to known_hosts
+        run: |
+          ssh-keyscan ${{ env.IP_ADDRESS }} >> ~/.ssh/known_hosts
           
       - name: Log in to Yandex Container Registry
         run: echo ${{ secrets.YCR_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
@@ -35,7 +39,7 @@ jobs:
 
       - name: Deploy Docker image
         run: |
-          ssh ${{ env.VM_USERNAME }}@${{ env.IP_ADDRESS }}
+          ssh -o StrictHostKeyChecking=no ${{ env.VM_USERNAME }}@${{ env.IP_ADDRESS }}
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
           docker stop app || true
           docker rm app || true
