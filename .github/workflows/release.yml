@@ -28,9 +28,11 @@ jobs:
         run: npm ci
 
       - name: Run test
+        if: matrix.job == 'test'
         run: npm run test
 
       - name: Run lint
+        if: matrix.job == 'lint'
         run: npm run lint
 
   release:
@@ -51,7 +53,9 @@ jobs:
         run: echo "release_version=${{ github.run_number }}" >> $GITHUB_ENV
 
       - name: Create release branch
-        run: git checkout -b releases/${{ env.release_version }}
+        run: |
+          git checkout -b releases/${{ env.release_version }}
+          git push origin releases/${{ env.release_version }}
 
       - name: Build and tag Docker image
         run: |
