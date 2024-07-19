@@ -35,7 +35,7 @@ jobs:
 
       - name: Deploy Docker image
         run: |
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_PRIVATE_KEY }} ${{ env.VM_USERNAME }}@${{ env.IP_ADDRESS }} << 'EOF'
+          ssh ${{ env.VM_USERNAME }}@${{ env.IP_ADDRESS }}
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
           docker stop app || true
           docker rm app || true
