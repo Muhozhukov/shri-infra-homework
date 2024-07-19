@@ -25,7 +25,7 @@ jobs:
 
       - name: Check Docker image existence
         run: |
-          if ! docker manifest inspect cr.yandex/${{ env.REGISTRY }}/app:${{ github.event.inputs.release_version }}_latest > /dev/null; then
+          if ! docker manifest inspect ${{ env.REGISTRY }}/app:${{ github.event.inputs.release_version }}_latest > /dev/null; then
             echo "Docker image not found"
             exit 1
           fi
@@ -33,10 +33,10 @@ jobs:
       - name: Deploy Docker image
         run: |
           ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_PRIVATE_KEY }} ${{ env.VM_USERNAME }}@${{ env.IP_ADDRESS }} << 'EOF'
-          docker pull cr.yandex/${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
           docker stop app || true
           docker rm app || true
-          docker run --name app -p 3000:3000 cr.yandex/${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
+          docker run --name app -p 3000:3000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
           EOF
 
       - name: Add comment to the appropriate GitHub Issue
