@@ -104,10 +104,10 @@ jobs:
               body: '${{ steps.release_notes.outputs.result }}'
             });
 
-      - name: Update CHANGELOG.md
-        run: |
-          echo "## Release ${{ env.release_version }} - $(date +'%Y-%m-%d')" >> CHANGELOG.md
-          echo "${{ steps.release_notes.outputs.result }}" >> CHANGELOG.md
-          git add CHANGELOG.md
-          git commit -m "Update CHANGELOG.md for release ${{ env.release_version }}"
-          git push origin releases/${{ env.release_version }}
+      # - name: Update CHANGELOG.md
+      #   run: |
+      #     echo "## Release ${{ env.release_version }} - $(date +'%Y-%m-%d')" >> CHANGELOG.md
+      #     echo "${{ steps.release_notes.outputs.result }}" >> CHANGELOG.md
+      #     git add CHANGELOG.md
+      #     git commit -m "Update CHANGELOG.md for release ${{ env.release_version }}"
+      #     git push origin releases/${{ env.release_version }}
