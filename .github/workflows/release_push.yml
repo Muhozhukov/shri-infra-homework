@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
   IMAGE_NAME: app
-  IP_ADDRESS: 51.250.39.125
+  IP_ADDRESS: 51.250.35.196
   VM_USERNAME: muhozhuk
 
 jobs:
