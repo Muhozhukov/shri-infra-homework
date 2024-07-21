@@ -1,0 +1,110 @@
+name: Add fix to release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version'
+        required: true
+env:
+  REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
+  IMAGE_NAME: app
+  IP_ADDRESS: 51.250.35.196
+  VM_USERNAME: muhozhuk
+  FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ github.run_number }}
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        job: [lint, test]
+    name: Run ${{ matrix.job }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 20.x
+        
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test
+        if: matrix.job == 'test'
+        run: npm run test
+
+      - name: Run lint
+        if: matrix.job == 'lint'
+        run: npm run lint
+
+  fix-release:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      
+      - name: Log in to Yandex Container Registry
+        run: echo ${{ secrets.YCR_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
+      
+      - name: Switch to release branch
+        run: |
+          git checkout -b releases/${{ github.event.inputs.release_version }}
+
+      - name: Build and tag Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }} .
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
+
+      - name: Push Docker image to registry
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
+      
+      - name: Create a fix release tag
+        run: |
+          git tag ${{ env.FIX_RELEASE_VERSION }}
+          git push origin ${{ env.FIX_RELEASE_VERSION }}
+
+      - name: Add comment to the appropriate GitHub Issue
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const releaseVersion = context.payload.inputs.release_version;
+            const fixNumber = github.run_number;
+            const { data: issues } = await github.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+
+            const releaseIssue = issues.find(issue => issue.title.includes(`Release ${releaseVersion}`));
+
+            if (!releaseIssue) {
+              throw new Error(`Issue for release version ${releaseVersion} not found`);
+            }
+
+            const { data: commits } = await github.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: `releases/${releaseVersion}`
+            });
+
+            const commitMessages = commits.map(commit => `- ${commit.commit.message}`).join('\n');
+
+            const comment = `Fix release ${releaseVersion} fix${fixNumber} has been deployed on ${new Date().toISOString()} by ${context.actor}.\n\nCommits:\n${commitMessages}\n\nDocker Image: cr.yandex/${{ secrets.YCR_REGISTRY_ID }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }}`;
+
+            await github.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: releaseIssue.number,
+              body: comment
+            });

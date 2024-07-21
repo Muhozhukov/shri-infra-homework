@@ -1,0 +1,72 @@
+name: Deploy release to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version'
+        required: true
+
+env:
+  REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
+  IMAGE_NAME: app
+  IP_ADDRESS: 51.250.35.196
+  VM_USERNAME: muhozhuk
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Add server to known_hosts
+        run: |
+          ssh-keyscan ${{ env.IP_ADDRESS }} >> ~/.ssh/known_hosts
+          
+      - name: Log in to Yandex Container Registry
+        run: echo ${{ secrets.YCR_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
+        
+      - name: Check Docker image existence
+        run: |
+          if ! docker manifest inspect ${{ env.REGISTRY }}/app:${{ github.event.inputs.release_version }}_latest > /dev/null; then
+            echo "Docker image not found"
+            exit 1
+          fi
+
+      - name: Deploy Docker image
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.VM_USERNAME }}@${{ env.IP_ADDRESS }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
+          docker stop app || true
+          docker rm app || true
+          docker run --name app -p 3000:3000 -d ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
+
+      - name: Add comment to the appropriate GitHub Issue
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const releaseVersion = context.payload.inputs.release_version;
+            const { data: issues } = await github.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            const releaseIssue = issues.find(issue => issue.title.includes(`Release ${releaseVersion}`));
+            
+            if (!releaseIssue) {
+              throw new Error(`Issue for release version ${releaseVersion} not found`);
+            }
+            
+            const comment = `Release version ${releaseVersion} has been deployed to production on ${new Date().toISOString()} by ${context.actor}.`;
+            
+            await github.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: releaseIssue.number,
+              body: comment
+            });

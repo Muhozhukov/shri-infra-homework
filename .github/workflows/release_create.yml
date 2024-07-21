@@ -1,0 +1,113 @@
+name: Create release
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
+  IMAGE_NAME: app
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        job: [lint, test]
+    name: Run ${{ matrix.job }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Use Node.js 20.x
+        
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test
+        if: matrix.job == 'test'
+        run: npm run test
+
+      - name: Run lint
+        if: matrix.job == 'lint'
+        run: npm run lint
+
+  release:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to Yandex Container Registry
+        run: echo ${{ secrets.YCR_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
+
+      - name: Extract version from GitHub run number
+        id: get-version
+        run: echo "release_version=${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Create release branch
+        run: |
+          git checkout -b releases/${{ env.release_version }}
+          git push origin releases/${{ env.release_version }}
+
+      - name: Build and tag Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.release_version }} .
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.release_version }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.release_version }}_latest
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.release_version }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.release_version }}_latest
+
+      - name: Create a new tag
+        run: |
+          git tag ${GITHUB_RUN_NUMBER}
+          git push origin ${GITHUB_RUN_NUMBER}
+
+      - name: Generate release notes
+        id: release_notes
+        uses: actions/github-script@v3
+        with:
+          script: |
+            const { data: commits } = await github.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: 'main'
+            });
+            const releaseNotes = `
+            ## Release ${process.env.release_version}
+            - Date: ${new Date().toISOString()}
+            - Author: ${context.actor}
+            - Version: ${process.env.release_version}
+            - Docker Image: ${process.env.REGISTRY}/${process.env.IMAGE_NAME}:${process.env.release_version}
+            - Commits:
+            ${commits.map(commit => `- ${commit.commit.message}`).join('\n')}
+            `;
+            return releaseNotes;
+
+      - name: Create GitHub issue
+        uses: actions/github-script@v3
+        with:
+          script: |
+            await github.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release ${process.env.release_version}`,
+              body: '${{ steps.release_notes.outputs.result }}'
+            });
+
+      # - name: Update CHANGELOG.md
+      #   run: |
+      #     echo "## Release ${{ env.release_version }} - $(date +'%Y-%m-%d')" >> CHANGELOG.md
+      #     echo "${{ steps.release_notes.outputs.result }}" >> CHANGELOG.md
+      #     git add CHANGELOG.md
+      #     git commit -m "Update CHANGELOG.md for release ${{ env.release_version }}"
+      #     git push origin releases/${{ env.release_version }}
