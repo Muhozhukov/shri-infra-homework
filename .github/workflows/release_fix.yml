@@ -41,6 +41,7 @@ jobs:
         run: npm run lint
 
   fix-release:
+    needs: lint-and-test
     runs-on: ubuntu-l
 
     steps:
@@ -71,7 +72,7 @@ jobs:
       - name: Increment fix release number
         id: fix-release
         run: echo "::set-output name=fix_number::$((${{ github.run_number }}))"
-        
+
       - name: Build and tag Docker image
         env:
           FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ steps.fix-release.outputs.fix_number }}
