@@ -1,4 +1,4 @@
-name: Fix Release
+name: Add fix to release
 
 on:
   workflow_dispatch:
