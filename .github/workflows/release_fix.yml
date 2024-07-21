@@ -11,7 +11,7 @@ env:
   IMAGE_NAME: app
   IP_ADDRESS: 51.250.35.196
   VM_USERNAME: muhozhuk
-  FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ env.fix_number }}
+  FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ github.run_number }}
 
 jobs:
   lint-and-test:
@@ -81,6 +81,7 @@ jobs:
 
       - name: Push Docker image to registry
         run: |
+          FIX_RELEASE_VERSION=${{ github.event.inputs.release_version }}_fix${{ env.fix_number }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
       
