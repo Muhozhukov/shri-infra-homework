@@ -11,6 +11,7 @@ env:
   IMAGE_NAME: app
   IP_ADDRESS: 51.250.35.196
   VM_USERNAME: muhozhuk
+  FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ env.fix_number }}
 
 jobs:
   lint-and-test:
@@ -67,21 +68,19 @@ jobs:
         run: |
           git checkout -b releases/${{ github.event.inputs.release_version }}
 
-      - name: Increment fix release number
-        id: fix-release
-        run: echo "::set-output name=fix_number::$((${{ github.run_number }}))" >> $GITHUB_ENV
+      # - name: Increment fix release number
+      #   id: fix-release
+      #   run: echo "::set-output name=fix_number::$((${{ github.run_number }}))" >> $GITHUB_ENV
 
       - name: Build and tag Docker image
         # env:
         #   FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ steps.fix-release.outputs.fix_number }}
         run: |
-          FIX_RELEASE_VERSION=${{ github.event.inputs.release_version }}_fix${{ env.fix_number }}
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }} .
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
 
       - name: Push Docker image to registry
         run: |
-          FIX_RELEASE_VERSION=${{ github.event.inputs.release_version }}_fix${{ env.fix_number }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
       
