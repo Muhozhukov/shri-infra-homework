@@ -52,15 +52,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       
-      # - name: Set up SSH
-      #   uses: webfactory/ssh-agent@v0.5.3
-      #   with:
-      #     ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      
-      # - name: Add server to known_hosts
-      #   run: |
-      #     ssh-keyscan ${{ env.IP_ADDRESS }} >> ~/.ssh/known_hosts
-      
       - name: Log in to Yandex Container Registry
         run: echo ${{ secrets.YCR_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
       
@@ -68,20 +59,13 @@ jobs:
         run: |
           git checkout -b releases/${{ github.event.inputs.release_version }}
 
-      # - name: Increment fix release number
-      #   id: fix-release
-      #   run: echo "::set-output name=fix_number::$((${{ github.run_number }}))" >> $GITHUB_ENV
-
       - name: Build and tag Docker image
-        # env:
-        #   FIX_RELEASE_VERSION: ${{ github.event.inputs.release_version }}_fix${{ steps.fix-release.outputs.fix_number }}
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }} .
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
 
       - name: Push Docker image to registry
         run: |
-          FIX_RELEASE_VERSION=${{ github.event.inputs.release_version }}_fix${{ env.fix_number }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
       
@@ -90,17 +74,12 @@ jobs:
           git tag ${{ env.FIX_RELEASE_VERSION }}
           git push origin ${{ env.FIX_RELEASE_VERSION }}
 
-      # - name: Create fix release tag
-      #   run: |
-      #     git tag -a ${GITHUB_REF#refs/heads/}-fix${{ steps.fix-release.outputs.fix_number }} -m "Fix release ${{ github.event.inputs.release_version }} fix${{ steps.fix-release.outputs.fix_number }}"
-      #     git push origin ${GITHUB_REF#refs/heads/}-fix${{ steps.fix-release.outputs.fix_number }}
-
       - name: Add comment to the appropriate GitHub Issue
         uses: actions/github-script@v3
         with:
           script: |
             const releaseVersion = context.payload.inputs.release_version;
-            const fixNumber = context.run_number;
+            const fixNumber = github.run_number;
             const { data: issues } = await github.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
