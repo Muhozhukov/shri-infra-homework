@@ -85,6 +85,11 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.FIX_RELEASE_VERSION }}
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_version }}_latest
       
+      - name: Create a new tag
+        run: |
+          git tag ${{ env.FIX_RELEASE_VERSION }}
+          git push origin ${{ env.FIX_RELEASE_VERSION }}
+
       - name: Create fix release tag
         run: |
           git tag -a ${GITHUB_REF#refs/heads/}-fix${{ steps.fix-release.outputs.fix_number }} -m "Fix release ${{ github.event.inputs.release_version }} fix${{ steps.fix-release.outputs.fix_number }}"
